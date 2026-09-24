@@ -590,6 +590,58 @@ class TestInvalid(util.TestCase):
         with self.assertRaises(TypeError):
             sv.filter('div', "not a tag", flags=flags)
 
+    def test_excessive_selectors(self):
+        """Test excessive selectors."""
+
+        # Build a 500 KB selector string: "a,a,a,...,a" (250,000 items)
+        count = 10000
+        selector = ",".join("a" for _ in range(count))
+
+        # Compile the selector
+        with self.assertRaises(ValueError):
+            sv.compile(selector)
+
+    def test_excessive_custom_selectors(self):
+        """Test excessive custom selectors."""
+
+        # Build a 500 KB selector string: "a,a,a,...,a" (250,000 items)
+        count = 10000
+        selector = ",".join("a" for _ in range(count))
+
+        # Compile the selector
+        with self.assertRaises(ValueError):
+            sv.compile('div:--custom', custom={':--custom': selector})
+
+    def test_excessive_custom_and_normal_selectors(self):
+        """Test excessive custom and normal selectors."""
+
+        count = 5000
+        selector = ",".join("a" for _ in range(count))
+
+        # Compile the selector
+        with self.assertRaises(ValueError):
+            sv.compile(f':is({selector}):--custom', custom={':--custom': selector})
+
+    def test_excessive_composite_selectors(self):
+        """Test excessive pre-defined composite selectors."""
+
+        # `:checked` expands to a pre-compiled list of several selectors,
+        # so 1000 of them exceed the limit even though the pattern itself is short.
+        with self.assertRaises(ValueError):
+            sv.compile('input' + ':checked' * 1000)
+
+        # `:nth-child(n)` without `of S` uses a pre-compiled default `*|*` selector.
+        with self.assertRaises(ValueError):
+            sv.compile('div' + ':nth-child(2)' * 5000)
+
+    def test_selectors_under_limit(self):
+        """Test that selectors under the limit still compile."""
+
+        count = 4000
+        selector = ",".join("a" for _ in range(count))
+        self.assertEqual(len(sv.compile(selector).selectors), count)
+        self.assertEqual(len(sv.compile('div:--custom', custom={':--custom': selector}).selectors), 1)
+
 
 class TestSyntaxErrorReporting(util.TestCase):
     """Test reporting of syntax errors."""
